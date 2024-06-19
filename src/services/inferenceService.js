@@ -1,22 +1,19 @@
-const loadModel = require('./loadModel');
-const detectAnimal = require('./detectAnimal');
-const tf = require('@tensorflow/tfjs-node');
+const tf = require('@tensorflow/tfjs');
+const fs = require('fs');
+const { loadModel } = require('./loadModel');
 
-async function predictBreed(imageBuffer) {
-    const animalType = await detectAnimal(imageBuffer);
+async function runInference(imagePath) {
+    // Load the model from GCS
+    const model = await loadModel();
 
-    if (!animalType) {
-        throw new Error('Animal not detected or not recognized as cat or dog');
-    }
+    // Read the image file
+    const image = fs.readFileSync(imagePath);
+    const tensor = tf.node.decodeImage(image).expandDims(0);
 
-    const model = await loadModel(animalType);
-    const imageTensor = tf.node.decodeImage(imageBuffer);
-    const resizedImage = tf.image.resizeBilinear(imageTensor, [224, 224]);
-    const normalizedImage = resizedImage.div(255.0).expandDims(0);
-    const prediction = model.predict(normalizedImage);
-    const result = prediction.arraySync();
+    // Run the model
+    const prediction = model.predict(tensor);
 
-    return { breed: result[0], animalType };
+    return prediction.arraySync();
 }
 
-module.exports = predictBreed;
+module.exports = { runInference };

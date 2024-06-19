@@ -1,46 +1,35 @@
+const tf = require('@tensorflow/tfjs');
 const { Storage } = require('@google-cloud/storage');
-const tf = require('@tensorflow/tfjs-node');
-const fs = require('fs');
 const path = require('path');
 
-const storage = new Storage();
-let dogModel, catModel;
+// Initialize Google Cloud Storage
+const storage = new Storage({
+    projectId: 'petverse-423806',  // Project ID
+    keyFilename: '/home/petverse-dataset/petverse-423806-c784a97fc161.json'  // Service account key
+});
 
-async function downloadModelFile(bucketName, srcFilename, destFilename) {
+// Function to get a signed URL if your bucket is private
+const getSignedUrl = async (bucketName, fileName) => {
     const options = {
-        destination: destFilename,
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 60 * 60 * 1000, // 1 hour
     };
-    await storage.bucket(bucketName).file(srcFilename).download(options);
-    console.log(`${srcFilename} downloaded to ${destFilename}.`);
-}
 
-async function loadModel(modelType) {
-    let model, modelPath, localModelPath;
+    const [url] = await storage.bucket(bucketName).file(fileName).getSignedUrl(options);
+    return url;
+};
 
-    if (modelType === 'dog') {
-        if (dogModel) return dogModel;
-        modelPath = 'PetVerse-dog-model/model.json';
-        localModelPath = path.join(__dirname, 'PetVerse-dog-model.json');
-    } else if (modelType === 'cat') {
-        if (catModel) return catModel;
-        modelPath = 'PetVerse-cat-model/model.json';
-        localModelPath = path.join(__dirname, 'PetVerse-cat-model.json');
-    } else {
-        throw new Error('Unknown model type');
-    }
+const loadModel = async () => {
+    // GCS bucket name and model path
+    const bucketName = 'dataset-model-petverse';
+    const modelPath = 'gs://dataset-model-petverse/PetVerse-dog-model/model.json';
 
-    await downloadModelFile('dataset-model-petverse', modelPath, localModelPath);
+    const url = `https://storage.googleapis.com/${bucketName}/${modelPath}`;  // If the bucket is public
 
-    model = await tf.loadLayersModel(`file://${localModelPath}`);
-    console.log(`${modelType} model loaded successfully`);
+    return await tf.loadGraphModel(url);
+};
 
-    if (modelType === 'dog') {
-        dogModel = model;
-    } else if (modelType === 'cat') {
-        catModel = model;
-    }
-
-    return model;
-}
-
-module.exports = loadModel;
+module.exports = {
+    loadModel,
+};

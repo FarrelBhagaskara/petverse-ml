@@ -1,28 +1,19 @@
-const predictBreed = require('../services/inferenceService');
-const { storePrediction, getBreedInfo } = require('../services/storeData');
+const inferenceService = require('../services/inferenceService');
 
-async function handlePredictBreed(req, res) {
+const uploadImage = async (req, res) => {
     try {
-        const imageBuffer = Buffer.from(req.body.image, 'base64');
-        const { breed, animalType } = await predictBreed(imageBuffer);
-        await storePrediction(req.body.image, breed);
-        const breedInfo = await getBreedInfo(breed);
-        res.status(200).send({ result: breed, animalType, breedInfo });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-}
+        const { file } = req;
+        if (!file) {
+            throw new InputError('No file uploaded');
+        }
 
-async function handleGetBreeds(req, res) {
-    try {
-        const breeds = await getAllBreeds();
-        res.status(200).send(breeds);
+        const result = await inferenceService.runInference(file);
+        res.status(200).json(result);
     } catch (error) {
-        res.status(500).send(error.message);
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
-}
+};
 
 module.exports = {
-    handlePredictBreed,
-    handleGetBreeds,
+    uploadImage,
 };

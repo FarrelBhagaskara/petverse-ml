@@ -1,8 +1,10 @@
 const express = require('express');
-const { handlePredictBreed, handleGetBreeds } = require('./handler');
-const router = express.Router();
+const multer = require('multer');
+const handler = require('./handler');
 
-router.post('/predict', handlePredictBreed);
-router.get('/breeds', handleGetBreeds);
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/upload', upload.single('image'), handler.uploadImage);
 
 module.exports = router;

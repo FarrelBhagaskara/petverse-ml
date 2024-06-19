@@ -1,33 +1,41 @@
-const { Firestore } = require('@google-cloud/firestore');
-const firestore = new Firestore();
+const { Storage } = require('@google-cloud/storage');
+const admin = require('firebase-admin');
 
-async function storePrediction(image, breed) {
-    const docRef = firestore.collection('predictions').doc();
+// Initialize Firebase Admin
+admin.initializeApp({
+    credential: admin.credential.cert('path/to/your-service-account-file.json'),
+    storageBucket: 'dataset-model-petverse'  // Bucket name
+});
+
+const storage = admin.storage();
+const firestore = admin.firestore();
+
+const bucketName = 'dataset-model-petverse';
+const collectionName = 'inference-result';
+
+const storeData = async (file, prediction) => {
+    // Get a reference to the bucket and file
+    const bucket = storage.bucket(bucketName);
+    const blob = bucket.file(file.originalname);
+
+    // Upload the file to GCS
+    await blob.save(file.buffer);
+
+    // Create a new document in the Firestore collection
+    const docRef = firestore.collection(collectionName).doc();
     await docRef.set({
-        image,
-        result: breed,
-        timestamp: Firestore.Timestamp.now(),
+        imageUrl: `https://storage.googleapis.com/${bucketName}/${file.originalname}`,
+        prediction: prediction,
+        timestamp: new Date(),
     });
-}
 
-async function getBreedInfo(breed) {
-    const breedInfoRef = firestore.collection('breeds').doc(breed);
-    const breedInfoDoc = await breedInfoRef.get();
-    return breedInfoDoc.exists ? breedInfoDoc.data() : {};
-}
-
-async function getAllBreeds() {
-    const breedsRef = firestore.collection('breeds');
-    const snapshot = await breedsRef.get();
-    const breeds = [];
-    snapshot.forEach(doc => {
-        breeds.push({ id: doc.id, ...doc.data() });
-    });
-    return breeds;
-}
+    // Return the stored data
+    return {
+        imageUrl: `https://storage.googleapis.com/${bucketName}/${file.originalname}`,
+        prediction: prediction,
+    };
+};
 
 module.exports = {
-    storePrediction,
-    getBreedInfo,
-    getAllBreeds,
+    storeData,
 };
